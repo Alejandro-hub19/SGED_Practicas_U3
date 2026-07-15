@@ -1,5 +1,6 @@
 package org.uteq.backend.estudiante.dto;
 
+import java.io.Serializable;
 import java.time.Instant;
 
 public record EstudianteResponse(
@@ -9,4 +10,4 @@ public record EstudianteResponse(
         String categoria,
         Boolean activo,
         Instant creadoEn
-) {}
+) implements Serializable {}
