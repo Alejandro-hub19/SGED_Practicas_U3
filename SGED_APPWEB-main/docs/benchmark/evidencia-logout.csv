@@ -1,0 +1,3 @@
+﻿"Momento","Endpoint","Esperado","Obtenido","Resultado"
+"Antes del logout","/api/auth/me","200","200","CORRECTO"
+"Despues del logout","/api/auth/me","401","401","CORRECTO"
