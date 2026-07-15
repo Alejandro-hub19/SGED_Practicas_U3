@@ -34,11 +34,17 @@ public class JwtService {
         return buildToken(username, rol, refreshExpirationMs, "refresh");
     }
 
+    /**
+     * El JTI se emite con .id(), que es el claim estandar "jti" de RFC 7519.
+     * Es el identificador unico que despues se usa como clave en la blacklist
+     * de Redis. Sin un JTI unico por token, revocar uno revocaria todos los
+     * tokens con la misma firma.
+     */
     private String buildToken(String username, String rol, long expMs, String type) {
         return Jwts.builder()
                 .subject(username)
+                .id(UUID.randomUUID().toString())   // claim "jti" estandar
                 .claim("rol", rol)
-                .claim("jti", UUID.randomUUID().toString())
                 .claim("type", type)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expMs))
@@ -51,7 +57,7 @@ public class JwtService {
     }
 
     public String extractJti(String token) {
-        return extractClaims(token).get("jti", String.class);
+        return extractClaims(token).getId();
     }
 
     public String extractRol(String token) {
@@ -62,10 +68,23 @@ public class JwtService {
         return expirationMs;
     }
 
+    /**
+     * Milisegundos que le quedan de vida al token. Se usa como TTL de la
+     * entrada en la blacklist: cuando el JWT expira por si mismo, la clave en
+     * Redis ya no hace falta y se borra automaticamente.
+     */
+    public long getTiempoRestanteMs(String token) {
+        long restante = extractClaims(token).getExpiration().getTime()
+                - System.currentTimeMillis();
+        return Math.max(restante, 0);
+    }
+
     public boolean isTokenValid(String token) {
-        return extractClaims(token)
-                .getExpiration()
-                .after(new Date());
+        try {
+            return extractClaims(token).getExpiration().after(new Date());
+        } catch (Exception ex) {
+            return false;   // firma invalida, malformado o expirado
+        }
     }
 
     private Claims extractClaims(String token) {

@@ -55,12 +55,14 @@ class AuthServiceTest {
                 .thenReturn(Optional.of(usuario));
         when(passwordEncoder.matches("123456", "hashedpass")).thenReturn(true);
         when(jwtService.generateToken("test@uteq.edu.ec", "USER")).thenReturn("jwt-token");
+        when(jwtService.generateRefreshToken("test@uteq.edu.ec", "USER")).thenReturn("refresh-token");
 
         var response = authService.login(new LoginRequest("test@uteq.edu.ec", "123456"));
 
         assertNotNull(response);
-        assertEquals("jwt-token", response.token());
-        assertEquals("USER", response.rol());
+        assertEquals("jwt-token", response.accessToken());
+        assertEquals("refresh-token", response.refreshToken());
+        assertEquals("USER", response.perfil().rol());
     }
 
     @Test

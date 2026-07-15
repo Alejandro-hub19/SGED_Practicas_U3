@@ -31,12 +31,15 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-
+  cache:
+    type: ${SPRING_CACHE_TYPE:redis}
 security:
   jwt:
     secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION_MS:3600000}
     refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+  cookie:
+    secure: ${COOKIE_SECURE:false}
 
 springdoc:
   api-docs:
