@@ -1,0 +1,26 @@
+C4Component
+  title Diagrama de Componentes (Nivel 3) - Backend Spring Boot
+
+  Container_Boundary(backend_boundary, "Aplicación Backend") {
+    Component(jwt_filter, "Middleware de Autenticación", "Spring Security, JWT Filter", "Intercepta las peticiones y valida el token JWT con la base o Redis (blacklist).")
+    Component(controllers, "Controladores (Controllers)", "Spring MVC REST Controllers", "Recibe peticiones HTTP, delega la lógica y retorna respuestas JSON.")
+    Component(services, "Servicios (Services)", "Spring Service Beans", "Contiene la lógica de negocio, transacciones, y anotaciones de caché (@Cacheable, @CacheEvict).")
+    Component(repositories, "Repositorios (Repositories)", "Spring Data JPA", "Provee abstracciones para acceder a los datos.")
+    Component(entities, "Capa ORM/Entidades (Entities)", "Hibernate/JPA Entities", "Mapeo objeto-relacional de las tablas de la base de datos.")
+  }
+
+  Container(frontend, "Aplicación Frontend", "Angular 17+", "Aplicación SPA")
+  ContainerDb(postgres, "Base de Datos", "PostgreSQL 16", "Almacenamiento relacional")
+  ContainerDb(redis, "Caché", "Redis 7", "Almacenamiento en memoria")
+
+  Rel(frontend, jwt_filter, "Hace peticiones a la API", "JSON/HTTPS")
+  Rel(jwt_filter, redis, "Verifica blacklist de JTI", "RESP")
+  Rel(jwt_filter, controllers, "Delega si la autenticación es exitosa", "Método interno")
+  
+  Rel(controllers, services, "Llama a la lógica de negocio", "Método de instancia")
+  
+  Rel(services, repositories, "Lee y escribe datos", "Método de interfaz")
+  Rel(services, redis, "Verifica/Actualiza caché", "RESP (Spring Data Redis)")
+  
+  Rel(repositories, entities, "Utiliza", "JPA")
+  Rel(repositories, postgres, "Ejecuta consultas", "JDBC")
