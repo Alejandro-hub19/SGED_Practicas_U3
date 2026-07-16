@@ -1,0 +1,16 @@
+C4Context
+  title Diagrama de Contexto (Nivel 1) - Sistema de Gestión para Escuela Deportiva ProFútbol (SGED)
+
+  Person(usuario_final, "Usuario Final", "Usuario del sistema (estudiante, entrenador, acudiente)")
+  Person(admin, "Administrador", "Administrador de la escuela deportiva")
+
+  System(sged, "SGED", "Sistema central para la gestión de la escuela deportiva.")
+
+  SystemDb_Ext(postgres, "PostgreSQL", "Almacena los datos relacionales de estudiantes, entidades deportivas y usuarios.")
+  SystemDb_Ext(redis, "Redis", "Gestión de sesiones, invalidación de tokens JWT (blacklist) y caché de consultas.")
+
+  Rel(usuario_final, sged, "Usa la aplicación web", "HTTPS")
+  Rel(admin, sged, "Administra el sistema", "HTTPS")
+
+  Rel(sged, postgres, "Lee y escribe datos", "JDBC")
+  Rel(sged, redis, "Lee y escribe datos en caché y sesión", "RESP")

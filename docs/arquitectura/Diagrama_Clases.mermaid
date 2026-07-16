@@ -1,0 +1,60 @@
+classDiagram
+  namespace org.uteq.backend.auth {
+    class AuthController
+    class AuthService
+    class UserRepository
+    class User
+    class JwtFilter
+  }
+  
+  namespace org.uteq.backend.estudiante {
+    class EstudianteController
+    class EstudianteService
+    class EstudianteRepository
+    class Estudiante
+  }
+
+  namespace org.uteq.backend.deportivo {
+    class CategoriaController
+    class CategoriaService
+    class CategoriaRepository
+    class Categoria
+    class AsistenciaController
+    class AsistenciaService
+    class AsistenciaRepository
+    class Asistencia
+    class EntrenadorController
+    class EntrenadorService
+    class EntrenadorRepository
+    class Entrenador
+    class EvaluacionDiariaController
+    class EvaluacionDiariaService
+    class EvaluacionDiariaRepository
+    class EvaluacionDiaria
+    class PosicionController
+    class PosicionRepository
+    class Posicion
+    class SesionEntrenamientoRepository
+    class SesionEntrenamiento
+  }
+  
+  AuthController --> AuthService
+  AuthService --> UserRepository
+  UserRepository --> User
+  JwtFilter --> UserRepository
+  
+  EstudianteController --> EstudianteService
+  EstudianteService --> EstudianteRepository
+  EstudianteRepository --> Estudiante
+  
+  AsistenciaController --> AsistenciaService
+  AsistenciaService --> AsistenciaRepository
+  AsistenciaRepository --> Asistencia
+  
+  EntrenadorController --> EntrenadorService
+  EntrenadorService --> EntrenadorRepository
+  EntrenadorRepository --> Entrenador
+  
+  EvaluacionDiariaController --> EvaluacionDiariaService
+  EvaluacionDiariaService --> EvaluacionDiariaRepository
+  EvaluacionDiariaRepository --> EvaluacionDiaria
