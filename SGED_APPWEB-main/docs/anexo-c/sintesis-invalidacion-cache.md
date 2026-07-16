@@ -17,7 +17,7 @@ afectar el resultado de múltiples combinaciones de consulta, por lo que invalid
 solo la clave "afectada" dejaría entradas obsoletas en otras páginas o filtros.
 Vaciar el namespace completo garantiza coherencia a costa de un mayor número de
 cache miss tras cada escritura, un compromiso razonable en un dominio donde las
-lecturas superan ampliamente a las escrituras.
+lecturas superan ampliamente a las escrituras (Privalov & Stupina, 2024).
 
 Como defensa adicional frente a fallos de invalidación, cada entrada tiene un
 **TTL** configurado. Si por algún motivo un `@CacheEvict` no se ejecutara, la
@@ -30,7 +30,7 @@ El *cache stampede* (o *thundering herd*) ocurre cuando una clave muy solicitada
 expira y, simultáneamente, numerosas peticiones concurrentes encuentran el cache
 miss y disparan la misma consulta costosa contra la base de datos. En lugar de
 aliviar la carga, la caché produce un pico abrupto que puede saturar el backend,
-justo el escenario que se pretendía evitar (Nygard, 2018).
+justo el escenario que se pretendía evitar.
 
 ### Estrategias de mitigación
 
@@ -56,8 +56,10 @@ riesgo de stampede es bajo. No obstante, bajo la carga concurrente prevista en e
 análisis de escalabilidad (miles de usuarios), la mitigación más adecuada sería
 combinar **TTL con jitter** —de implementación trivial— con un **mutex** sobre la
 consulta principal de listado, que es la clave más solicitada y la más costosa de
-recalcular.
+recalcular. La literatura reciente confirma que una gestión adecuada del TTL y de
+la estrategia de invalidación es determinante para mantener una alta tasa de
+aciertos de caché sin servir datos obsoletos (Privalov & Stupina, 2024).
 
 ## Referencias
 
-- Nygard, M. T. (2018). *Release it!: Design and deploy production-ready software* (2nd ed.). Pragmatic Bookshelf.
+- Privalov, M., & Stupina, A. (2024). Improving web-oriented information systems efficiency using Redis caching mechanisms. *Indonesian Journal of Electrical Engineering and Computer Science, 33*(3), 1667–1675. https://doi.org/10.11591/ijeecs.v33.i3.pp1667-1675
