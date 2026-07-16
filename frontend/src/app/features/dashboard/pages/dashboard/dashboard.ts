@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { Auth } from '../../../../auth/services/auth';
+import { Auth } from '../../../auth/services/auth';
 
 interface Categoria { name: string; val: number; color: string; }
 interface Actividad {
@@ -86,8 +86,7 @@ export class Dashboard implements OnInit {
   protected nextYear(): void { if (this.year() < 2026) this.year.update((y) => y + 1); }
 
   protected logout(): void {
-    this.auth.logout();
-    this.router.navigate(['/login']);
+    this.auth.logout().subscribe(() => this.router.navigate(['/login']));
   }
 
   // ----- Utilidades -----

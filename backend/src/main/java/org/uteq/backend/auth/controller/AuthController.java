@@ -109,7 +109,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> me(Authentication authentication) {
-        return ResponseEntity.ok(Map.of("username", authentication.getName()));
+    public ResponseEntity<LoginResponse> me(Authentication authentication) {
+        return ResponseEntity.ok(authService.obtenerPerfil(authentication.getName()));
     }
 }
