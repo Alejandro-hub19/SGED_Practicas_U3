@@ -36,7 +36,7 @@ def leer(ruta: Path) -> list[float]:
             "Ejecuta primero benchmark-cache.ps1 en los dos escenarios."
         )
     with ruta.open(encoding="utf-8-sig") as f:
-        return [float(fila["ms"]) for fila in csv.DictReader(f)]
+        return [float(fila["ms"].replace(",", ".")) for fila in csv.DictReader(f)]
 
 
 def percentil(datos: list[float], p: float) -> float:
