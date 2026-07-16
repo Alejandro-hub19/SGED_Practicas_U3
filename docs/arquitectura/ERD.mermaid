@@ -1,0 +1,55 @@
+erDiagram
+    USUARIO {
+        bigint id PK
+        varchar email
+        varchar password
+    }
+    ROL {
+        bigint id PK
+        varchar nombre
+    }
+    ESTUDIANTE {
+        bigint id PK
+        varchar nombre
+        varchar apellido
+        date fecha_nacimiento
+    }
+    ENTRENADOR {
+        bigint id PK
+        varchar nombre
+        varchar apellido
+    }
+    SESION_ENTRENAMIENTO {
+        bigint id PK
+        date fecha
+        varchar objetivo
+    }
+    ASISTENCIA {
+        bigint id PK
+        boolean presente
+    }
+    EVALUACION_DIARIA {
+        bigint id PK
+        date fecha
+    }
+    CRITERIO_EVALUACION {
+        bigint id PK
+        varchar nombre
+    }
+    DETALLE_EVALUACION {
+        bigint id PK
+        int puntuacion
+    }
+    POSICION {
+        bigint id PK
+        varchar nombre
+    }
+
+    USUARIO ||--o{ ROL : "tiene"
+    ESTUDIANTE ||--o{ ASISTENCIA : "registra"
+    SESION_ENTRENAMIENTO ||--o{ ASISTENCIA : "toma_en"
+    ESTUDIANTE ||--o{ EVALUACION_DIARIA : "recibe"
+    ENTRENADOR ||--o{ EVALUACION_DIARIA : "realiza"
+    EVALUACION_DIARIA ||--o{ DETALLE_EVALUACION : "contiene"
+    CRITERIO_EVALUACION ||--o{ DETALLE_EVALUACION : "evaluado_en"
+    ESTUDIANTE ||--o{ POSICION : "juega_en"

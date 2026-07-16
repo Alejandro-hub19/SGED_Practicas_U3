@@ -1,0 +1,21 @@
+C4Container
+  title Diagrama de Contenedores (Nivel 2) - SGED
+
+  Person(usuario_final, "Usuario Final", "Usuario del sistema")
+  Person(admin, "Administrador", "Administrador del sistema")
+
+  System_Boundary(sged_boundary, "SGED") {
+    Container(frontend, "Aplicación Frontend", "Angular 17+", "Provee la interfaz de usuario. SPA que se comunica con las APIs del backend.")
+    Container(backend, "Aplicación Backend", "Java 21, Spring Boot 3.x", "Provee APIs RESTful, lógica de negocio y seguridad.")
+    
+    ContainerDb(postgres, "Base de Datos Principal", "PostgreSQL 16", "Almacena información persistente de usuarios, estudiantes, datos deportivos.")
+    ContainerDb(redis, "Caché y Sesiones", "Redis 7", "Almacena la blacklist de JWT y sirve como caché de consultas (Cache-Aside).")
+  }
+
+  Rel(usuario_final, frontend, "Visita sged.com", "HTTPS")
+  Rel(admin, frontend, "Administra en sged.com", "HTTPS")
+
+  Rel(frontend, backend, "Realiza llamadas a la API", "JSON/HTTPS")
+  
+  Rel(backend, postgres, "Lee y escribe información", "JDBC")
+  Rel(backend, redis, "Consulta y actualiza caché/sesiones", "RESP")
