@@ -1,3 +1,37 @@
+# Medicion del speedup del cache (Redis)
+
+**Endpoint medido:** `GET /api/estudiantes?page=0&size=20`
+**Corridas:** 10 por escenario (mas 3 de calentamiento, descartadas)
+**Metodo:** la aplicacion se ejecuta dos veces, con `SPRING_CACHE_TYPE=none`
+y con `SPRING_CACHE_TYPE=redis`. No se recompila entre escenarios: solo cambia
+la estrategia de cache, de modo que la unica variable es la presencia de Redis.
+
+## Latencias por corrida (ms)
+
+| Corrida | Sin cache | Con cache |
+|:-------:|----------:|----------:|
+| 1 | 67.95 | 31.89 |
+| 2 | 64.26 | 32.55 |
+| 3 | 58.88 | 33.39 |
+| 4 | 56.55 | 28.48 |
+| 5 | 56.30 | 30.41 |
+| 6 | 61.13 | 30.89 |
+| 7 | 70.50 | 28.09 |
+| 8 | 61.26 | 31.03 |
+| 9 | 76.57 | 29.91 |
+| 10 | 58.27 | 28.75 |
+
+## Resumen
+
+| Metrica | Sin cache (T_sin) | Con cache (T_con) | Speedup S = T_sin / T_con |
+|---------|------------------:|------------------:|--------------------------:|
+| Promedio | 63.17 ms | 30.54 ms | **2.07x** |
+| P95      | 73.84 ms | 33.01 ms | **2.24x** |
+| Minimo   | 56.30 ms | 28.09 ms | — |
+| Maximo   | 76.57 ms | 33.39 ms | — |
+
+**Reduccion de latencia promedio: 51.7 %**
+
 ## Analisis de la mejora
 
 La introduccion de una capa de cache con Redis mediante el patron *cache-aside*
@@ -37,6 +71,22 @@ repetido; reconocer esta limitacion es mas riguroso que presentar el numero como
 definitivo. Los valores obtenidos son coherentes con los reportados en la
 literatura reciente para el patron cache-aside con Redis sobre bases de datos
 relacionales (Privalov & Stupina, 2024).
+
+## Reproducibilidad
+
+```powershell
+docker compose -f infra-local.yml up -d
+
+$env:SPRING_CACHE_TYPE="none"
+cd backend; .\mvnw spring-boot:run
+.\scripts\benchmark-cache.ps1 -Escenario sin-cache -Usuario "test@uteq.edu.ec" -Clave "Test1234"
+
+$env:SPRING_CACHE_TYPE="redis"
+cd backend; .\mvnw spring-boot:run
+.\scripts\benchmark-cache.ps1 -Escenario con-cache -Usuario "test@uteq.edu.ec" -Clave "Test1234"
+
+python .\scripts\analizar_benchmark.py
+```
 
 ## Referencias
 
