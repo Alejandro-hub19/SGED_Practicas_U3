@@ -54,3 +54,4 @@ management:
     web:
       exposure:
         include: health,info,metrics
+spring.devtools.restart.enabled: false        

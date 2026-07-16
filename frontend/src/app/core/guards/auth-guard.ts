@@ -1,15 +1,17 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { Auth } from '../../auth/services/auth';
+import { map } from 'rxjs';
+import { Auth } from '../../features/auth/services/auth';
 
-export const authGuard: CanActivateFn = (route, state) => {
+/**
+ * No hay token legible en el cliente (cookie HttpOnly), asi que la unica
+ * forma de saber si hay sesion activa es preguntandole al servidor.
+ */
+export const authGuard: CanActivateFn = () => {
   const auth = inject(Auth);
   const router = inject(Router);
 
-  if (auth.isAuthenticated()) {
-    return true;
-  }
-
-  router.navigate(['/login']);
-  return false;
+  return auth
+    .checkSession()
+    .pipe(map((autenticado) => autenticado || router.createUrlTree(['/login'])));
 };

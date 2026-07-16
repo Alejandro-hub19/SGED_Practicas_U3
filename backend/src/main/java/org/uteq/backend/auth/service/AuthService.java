@@ -140,6 +140,31 @@ public class AuthService {
     }
 
     /**
+     * Perfil del usuario autenticado, para GET /api/auth/me.
+     *
+     * El frontend no puede leer el JWT (viaja en cookie HttpOnly), asi que esta
+     * es la unica forma de que Angular sepa si hay sesion activa y con que rol,
+     * despues de un login o de recargar la pagina.
+     */
+    @Transactional(readOnly = true)
+    public LoginResponse obtenerPerfil(String username) {
+
+        Usuario usuario = usuarioRepository
+                .findByUsername(username)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
+
+        List<UsuarioRol> roles = usuarioRolRepository.findByUsuario(usuario);
+        String rol = roles.isEmpty() ? "USER" : roles.get(0).getRol().getNombre();
+
+        return LoginResponse.builder()
+                .username(usuario.getUsername())
+                .nombre(usuario.getPersona().getNombre()
+                        + " " + usuario.getPersona().getApellido())
+                .rol(rol)
+                .build();
+    }
+
+    /**
      * Revoca el token actual insertando su JTI en Redis.
      *
      * El TTL se calcula como la vida RESTANTE del token, no como su duracion
