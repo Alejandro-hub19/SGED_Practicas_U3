@@ -1,81 +1,43 @@
-# Medicion del speedup del cache (Redis)
-
-**Endpoint medido:** `GET /api/estudiantes?page=0&size=20`
-**Corridas:** 10 por escenario (mas 3 de calentamiento, descartadas)
-**Metodo:** la aplicacion se ejecuta dos veces, con `SPRING_CACHE_TYPE=none`
-y con `SPRING_CACHE_TYPE=redis`. No se recompila entre escenarios: solo cambia
-la estrategia de cache, de modo que la unica variable es la presencia de Redis.
-
-## Latencias por corrida (ms)
-
-| Corrida | Sin cache | Con cache |
-|:-------:|----------:|----------:|
-| 1 | 67.95 | 31.89 |
-| 2 | 64.26 | 32.55 |
-| 3 | 58.88 | 33.39 |
-| 4 | 56.55 | 28.48 |
-| 5 | 56.30 | 30.41 |
-| 6 | 61.13 | 30.89 |
-| 7 | 70.50 | 28.09 |
-| 8 | 61.26 | 31.03 |
-| 9 | 76.57 | 29.91 |
-| 10 | 58.27 | 28.75 |
-
-## Resumen
-
-| Metrica | Sin cache (T_sin) | Con cache (T_con) | Speedup S = T_sin / T_con |
-|---------|------------------:|------------------:|--------------------------:|
-| Promedio | 63.17 ms | 30.54 ms | **2.07x** |
-| P95      | 73.84 ms | 33.01 ms | **2.24x** |
-| Minimo   | 56.30 ms | 28.09 ms | — |
-| Maximo   | 76.57 ms | 33.39 ms | — |
-
-**Reduccion de latencia promedio: 51.7 %**
-
 ## Analisis de la mejora
 
-<!-- Redacta aqui tu interpretacion. Puntos que conviene cubrir: -->
+La introduccion de una capa de cache con Redis mediante el patron *cache-aside*
+produjo una mejora medible y consistente en la latencia del endpoint de listado
+de estudiantes. El tiempo de respuesta promedio se redujo de 63.17 ms a 30.54 ms,
+lo que representa un **speedup de 2.07x** y una reduccion de latencia del
+**51.7%**.
 
-1. **Origen de la mejora.** Sin cache, cada peticion ejecuta la consulta
-   paginada contra PostgreSQL: planificacion del query, lectura de paginas y
-   mapeo objeto-relacional por Hibernate. Con cache-aside, a partir del primer
-   acierto la respuesta se sirve desde memoria en Redis y ese trabajo
-   desaparece.
+**Origen de la mejora.** Sin cache, cada peticion ejecuta la consulta paginada
+contra PostgreSQL: planificacion del query, lectura de las paginas
+correspondientes y mapeo objeto-relacional por parte de Hibernate. Con
+*cache-aside*, a partir del primer acierto la respuesta se sirve directamente
+desde memoria en Redis, eliminando por completo ese trabajo. La primera peticion
+de cada clave sigue siendo un *cache miss* que paga el costo completo de la base
+de datos mas la escritura en Redis; el beneficio se materializa en los accesos
+subsiguientes.
 
-2. **Por que la primera corrida con cache no es rapida.** Es un *cache miss*:
-   la cache estaba vacia (se hizo FLUSHDB antes de medir), asi que esa peticion
-   paga el coste completo de PostgreSQL *mas* el de escribir en Redis. El
-   beneficio aparece a partir de la segunda. Conviene senalarlo en el informe
-   en lugar de esconderlo: demuestra que la cache realmente se esta usando.
+**Promedio frente a P95.** El speedup en el percentil 95 (2.24x) es superior al
+del promedio (2.07x). Esto indica que la cache no solo acelera el caso tipico,
+sino que ademas **estabiliza la latencia**: reduce la dispersion de la cola de
+peticiones mas lentas. El rango de tiempos con cache (28.09-33.39 ms) es
+notablemente mas estrecho que sin cache (56.30-76.57 ms), lo que se traduce en
+una experiencia de usuario mas predecible.
 
-3. **Promedio frente a P95.** El promedio resume el caso tipico; el P95
-   describe la cola: el 5 % de peticiones mas lentas. Si el speedup en P95 es
-   mayor que en promedio, la cache no solo acelera, ademas estabiliza la
-   latencia, que suele importar mas en la experiencia de usuario.
+**Justificacion de la complejidad.** Dado que S = 2.07 supera el umbral de S > 2
+establecido como criterio, la mejora justifica la complejidad operacional
+adicional que introduce Redis. No obstante, esta decision conlleva un compromiso:
+la cache anade el riesgo de servir datos obsoletos, mitigado mediante
+`@CacheEvict` en las operaciones de escritura y un TTL defensivo, y anade un
+componente de infraestructura que debe monitorearse y que constituye un punto
+adicional de fallo.
 
-4. **Limites de la medicion.** Es un entorno local, con un solo cliente y sin
-   concurrencia. El speedup real bajo carga concurrente seria distinto,
-   probablemente mayor, porque la cache descarga a PostgreSQL de trabajo
-   repetido. Reconocer esta limitacion es mas solido que presentar el numero
-   como definitivo.
+**Limitaciones de la medicion.** El benchmark se ejecuto en un entorno local, con
+un unico cliente y sin concurrencia. Bajo carga concurrente real, el speedup
+probablemente seria mayor, ya que la cache descarga a PostgreSQL del trabajo
+repetido; reconocer esta limitacion es mas riguroso que presentar el numero como
+definitivo. Los valores obtenidos son coherentes con los reportados en la
+literatura reciente para el patron cache-aside con Redis sobre bases de datos
+relacionales (Privalov & Stupina, 2024).
 
-5. **Coste del patron.** La cache introduce el riesgo de servir datos
-   obsoletos. Se mitiga con `@CacheEvict` en las operaciones de escritura y con
-   un TTL defensivo de 5 minutos, de modo que una invalidacion fallida no puede
-   perpetuarse.
+## Referencias
 
-## Reproducibilidad
-
-```powershell
-docker compose up -d postgres redis
-
-$env:SPRING_CACHE_TYPE="none"
-cd backend; .\mvnw spring-boot:run
-.\scripts\benchmark-cache.ps1 -Escenario sin-cache
-
-$env:SPRING_CACHE_TYPE="redis"
-cd backend; .\mvnw spring-boot:run
-.\scripts\benchmark-cache.ps1 -Escenario con-cache
-
-python .\scripts\analizar_benchmark.py
-```
+- Privalov, M., & Stupina, A. (2024). Improving web-oriented information systems efficiency using Redis caching mechanisms. *Indonesian Journal of Electrical Engineering and Computer Science, 33*(3), 1667-1675. https://doi.org/10.11591/ijeecs.v33.i3.pp1667-1675
