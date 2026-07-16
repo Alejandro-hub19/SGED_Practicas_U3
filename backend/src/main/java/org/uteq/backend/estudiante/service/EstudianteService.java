@@ -1,15 +1,21 @@
 package org.uteq.backend.estudiante.service;
 
+
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.uteq.backend.auth.entity.Persona;
 import org.uteq.backend.auth.repository.PersonaRepository;
 import org.uteq.backend.estudiante.dto.EstudianteRequest;
 import org.uteq.backend.estudiante.dto.EstudianteResponse;
+import org.uteq.backend.estudiante.dto.PageResponse;
 import org.uteq.backend.estudiante.entity.Estudiante;
 import org.uteq.backend.estudiante.repository.EstudianteRepository;
+import org.uteq.backend.estudiante.repository.EstudianteSpecification;
 
 @Service
 @RequiredArgsConstructor
@@ -18,9 +24,19 @@ public class EstudianteService {
     private final EstudianteRepository estudianteRepository;
     private final PersonaRepository personaRepository;
 
-    public Page<EstudianteResponse> listar(Pageable pageable) {
-        return estudianteRepository.findByActivoTrue(pageable)
+    @Transactional(readOnly = true)
+    @Cacheable(
+        value = "estudiantes",
+        key = "#nombre + '-' + #apellido + '-' + #categoria + '-' + #activo + '-' + #pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()"
+    )
+    public PageResponse<EstudianteResponse> listar(
+            Pageable pageable, String nombre, String apellido, String categoria, Boolean activo) {
+
+        var spec = EstudianteSpecification.conFiltros(nombre, apellido, categoria, activo);
+        Page<EstudianteResponse> page = estudianteRepository.findAll(spec, pageable)
                 .map(this::toResponse);
+
+        return PageResponse.from(page);
     }
 
     public EstudianteResponse buscarPorId(Long id) {
@@ -29,6 +45,7 @@ public class EstudianteService {
                 .orElseThrow(() -> new RuntimeException("Estudiante no encontrado"));
     }
 
+    @CacheEvict(value = "estudiantes", allEntries = true)
     public EstudianteResponse crear(EstudianteRequest request) {
         Persona persona = Persona.builder()
                 .nombre(request.nombre())
@@ -46,6 +63,7 @@ public class EstudianteService {
         return toResponse(estudiante);
     }
 
+    @CacheEvict(value = "estudiantes", allEntries = true)
     public EstudianteResponse actualizar(Long id, EstudianteRequest request) {
         Estudiante estudiante = estudianteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Estudiante no encontrado"));
@@ -58,6 +76,7 @@ public class EstudianteService {
         return toResponse(estudiante);
     }
 
+    @CacheEvict(value = "estudiantes", allEntries = true)
     public void eliminar(Long id) {
         Estudiante estudiante = estudianteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Estudiante no encontrado"));

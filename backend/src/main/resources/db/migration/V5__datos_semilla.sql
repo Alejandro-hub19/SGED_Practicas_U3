@@ -68,6 +68,70 @@ INSERT INTO seguridad.personas (nombre, apellido, cedula, correo, telefono, fech
     ('Fernanda', 'Ganchozo', '1200001030', 'fganchozo@sged.edu.ec', '0990001030', '2008-04-14')
 ON CONFLICT DO NOTHING;
 
+-- Personas adicionales (25 estudiantes mas, para superar comodamente el minimo de 50)
+INSERT INTO seguridad.personas (nombre, apellido, cedula, correo, telefono, fecha_nacimiento) VALUES
+    ('Matias', 'Arcos', '1200001031', 'marcos@sged.edu.ec', '0990001031', '2016-03-05'),
+    ('Valeria', 'Bermeo', '1200001032', 'vbermeo@sged.edu.ec', '0990001032', '2015-09-12'),
+    ('Joel', 'Coello', '1200001033', 'jcoello@sged.edu.ec', '0990001033', '2016-07-18'),
+    ('Amelia', 'Delgadillo', '1200001034', 'adelgadillo@sged.edu.ec', '0990001034', '2015-05-22'),
+    ('Thiago', 'Estrella', '1200001035', 'testrella@sged.edu.ec', '0990001035', '2014-11-30'),
+    ('Luciana', 'Farinango', '1200001036', 'lfarinango@sged.edu.ec', '0990001036', '2013-08-14'),
+    ('Emmanuel', 'Guaman', '1200001037', 'eguaman@sged.edu.ec', '0990001037', '2014-02-27'),
+    ('Zoe', 'Hidalgo', '1200001038', 'zhidalgo@sged.edu.ec', '0990001038', '2013-06-09'),
+    ('Adrian', 'Ibarra', '1200001039', 'aibarra@sged.edu.ec', '0990001039', '2012-10-16'),
+    ('Renata', 'Jara', '1200001040', 'rjara@sged.edu.ec', '0990001040', '2011-04-03'),
+    ('Benjamin', 'Klinger', '1200001041', 'bklinger@sged.edu.ec', '0990001041', '2012-01-25'),
+    ('Antonella', 'Lino', '1200001042', 'alino@sged.edu.ec', '0990001042', '2011-09-11'),
+    ('Maximiliano', 'Moran', '1200001043', 'mmoran@sged.edu.ec', '0990001043', '2010-12-08'),
+    ('Ivanna', 'Naranjo', '1200001044', 'inaranjo@sged.edu.ec', '0990001044', '2009-03-19'),
+    ('Gael', 'Oleas', '1200001045', 'goleas@sged.edu.ec', '0990001045', '2010-07-24'),
+    ('Paula', 'Pincay', '1200001046', 'ppincay@sged.edu.ec', '0990001046', '2009-11-02'),
+    ('Santiago', 'Quimi', '1200001047', 'squimi@sged.edu.ec', '0990001047', '2010-05-15'),
+    ('Martina', 'Robalino', '1200001048', 'mrobalino@sged.edu.ec', '0990001048', '2007-08-28'),
+    ('Facundo', 'Suarez', '1200001049', 'fsuarez@sged.edu.ec', '0990001049', '2008-02-06'),
+    ('Julieta', 'Toala', '1200001050', 'jtoala@sged.edu.ec', '0990001050', '2007-10-13'),
+    ('Ian', 'Urgiles', '1200001051', 'iurgiles@sged.edu.ec', '0990001051', '2008-06-21'),
+    ('Delfina', 'Vera', '1200001052', 'dvera@sged.edu.ec', '0990001052', '2007-04-09'),
+    ('Lorenzo', 'Wong', '1200001053', 'lwong@sged.edu.ec', '0990001053', '2008-09-17'),
+    ('Abril', 'Xavier', '1200001054', 'axavier@sged.edu.ec', '0990001054', '2007-01-30'),
+    ('Ignacio', 'Zamora', '1200001055', 'izamora@sged.edu.ec', '0990001055', '2008-12-04')
+ON CONFLICT DO NOTHING;
+
+-- Estudiantes adicionales (25 mas, repartidos en las 5 categorias existentes)
+INSERT INTO seguridad.estudiantes (id_persona, categoria, fecha_ingreso, id_posicion, rfid_codigo, activo)
+SELECT p.id_persona, v.categoria, v.fecha_ingreso::timestamptz, pos.id_posicion,
+       NULLIF(v.rfid, ''), TRUE
+FROM (VALUES
+    ('1200001031','Sub-10','2024-02-01','Portero','RFID-1031'),
+    ('1200001032','Sub-10','2024-02-15','Defensa central',''),
+    ('1200001033','Sub-10','2024-03-01','Mediocentro','RFID-1033'),
+    ('1200001034','Sub-10','2024-03-01','Delantero centro',''),
+    ('1200001035','Sub-10','2024-03-15','Extremo derecho','RFID-1035'),
+    ('1200001036','Sub-12','2023-02-01','Portero',''),
+    ('1200001037','Sub-12','2023-02-15','Lateral derecho','RFID-1037'),
+    ('1200001038','Sub-12','2023-03-01','Mediocentro defensivo',''),
+    ('1200001039','Sub-12','2023-03-01','Mediapunta','RFID-1039'),
+    ('1200001040','Sub-12','2023-03-15','Delantero centro',''),
+    ('1200001041','Sub-14','2022-02-01','Portero','RFID-1041'),
+    ('1200001042','Sub-14','2022-02-15','Defensa central',''),
+    ('1200001043','Sub-14','2022-03-01','Lateral izquierdo','RFID-1043'),
+    ('1200001044','Sub-14','2022-03-01','Extremo izquierdo',''),
+    ('1200001045','Sub-14','2022-03-15','Delantero centro','RFID-1045'),
+    ('1200001046','Sub-16','2021-02-01','Portero',''),
+    ('1200001047','Sub-16','2021-02-15','Defensa central','RFID-1047'),
+    ('1200001048','Sub-16','2021-03-01','Mediocentro defensivo',''),
+    ('1200001049','Sub-16','2021-03-01','Mediapunta','RFID-1049'),
+    ('1200001050','Sub-16','2021-03-15','Delantero centro',''),
+    ('1200001051','Sub-18','2020-02-01','Portero','RFID-1051'),
+    ('1200001052','Sub-18','2020-02-15','Defensa central',''),
+    ('1200001053','Sub-18','2020-03-01','Lateral derecho','RFID-1053'),
+    ('1200001054','Sub-18','2020-03-01','Mediocentro',''),
+    ('1200001055','Sub-18','2020-03-15','Delantero centro','RFID-1055')
+) AS v(cedula, categoria, fecha_ingreso, posicion, rfid)
+JOIN seguridad.personas p ON p.cedula = v.cedula
+JOIN deportivo.posiciones pos ON pos.nombre = v.posicion
+ON CONFLICT DO NOTHING;
+
 -- ------------------------------------------------------------
 -- 3) Usuarios (admin + 5 entrenadores) y su rol
 --    NOTA: password_hash es un PLACEHOLDER. Si necesitas iniciar

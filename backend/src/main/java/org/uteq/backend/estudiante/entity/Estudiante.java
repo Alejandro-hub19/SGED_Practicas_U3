@@ -39,11 +39,13 @@ public class Estudiante {
     private Instant actualizadoEn;
 
     @PrePersist
-    public void prePersist() {
-        this.creadoEn = Instant.now();
-        this.actualizadoEn = Instant.now();
+public void prePersist() {
+    this.creadoEn = Instant.now();
+    this.actualizadoEn = Instant.now();
+    if (this.activo == null) {
         this.activo = true;
     }
+}
 
     @PreUpdate
     public void preUpdate() {
