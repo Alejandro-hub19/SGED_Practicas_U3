@@ -149,6 +149,46 @@ frametitlealignment=\centering
 	\section{Fundamento Teórico}
 	
 	% -----------------------------------------------------------
+	\subsection{5.1 Gestión de Estado en Aplicaciones Web}
+	\textit{(Elaborado por: Pallo Pinto Daniel Alejandro)}
+
+	El protocolo HTTP es, por diseño, un protocolo \textit{stateless}: cada petición se procesa de forma independiente y el servidor no conserva información sobre las peticiones anteriores del mismo cliente. Esta característica favorece la escalabilidad horizontal, porque cualquier instancia del servidor puede atender cualquier petición sin depender de un estado local. Sin embargo, las aplicaciones reales requieren mantener estado —sesiones de usuario, autenticación, preferencias—, lo que obliga a introducir mecanismos externos que reconcilien la naturaleza stateless de HTTP con la necesidad de continuidad (Bucko et al., 2023).
+
+	\subsubsection*{Mecanismos de almacenamiento del lado del cliente}
+
+	Existen tres mecanismos principales para almacenar estado en el navegador, cada uno con características distintas:
+
+	\begin{table}[H]
+		\centering
+		\resizebox{\textwidth}{!}{%
+			\begin{tabular}{@{}p{3.2cm}p{3.5cm}p{3.5cm}p{4.5cm}@{}}
+				\toprule
+				\textbf{Característica} & \textbf{localStorage} & \textbf{sessionStorage} & \textbf{Cookies} \\ \midrule
+				Capacidad & \textasciitilde 5--10 MB & \textasciitilde 5--10 MB & \textasciitilde 4 KB \\[4pt]
+				Persistencia & Permanente & Hasta cerrar pestaña & Configurable (Max-Age) \\[4pt]
+				Accesible desde JS & Sí & Sí & Solo si no es HttpOnly \\[4pt]
+				Envío automático al servidor & No & No & Sí \\[4pt]
+				Riesgo XSS & Alto & Alto & Bajo (con HttpOnly) \\[4pt]
+				Riesgo CSRF & Bajo & Bajo & Alto (mitigable con SameSite) \\
+				\bottomrule
+			\end{tabular}%
+		}
+		\caption{Comparativa de mecanismos de almacenamiento del lado del cliente.}
+	\end{table}
+
+	La elección entre estos mecanismos depende de un compromiso de seguridad. Almacenar un token de autenticación en \texttt{localStorage} lo hace legible por cualquier script inyectado mediante un ataque de \textit{cross-site scripting} (XSS), ya que este almacenamiento es accesible a cualquier script que se ejecute en el contexto de la página (OWASP Foundation, 2021). Por el contrario, una cookie con el atributo \texttt{HttpOnly} es inaccesible desde JavaScript, lo que impide que un script lea el token y lo exfiltre, mitigando así el robo por XSS; a cambio, introduce exposición a \textit{cross-site request forgery} (CSRF), mitigable mediante el atributo \texttt{SameSite}.
+
+	En el presente sistema (SGED) se optó por almacenar el JWT en una cookie HttpOnly con \texttt{SameSite=Lax}, priorizando la protección contra XSS. El token nunca se expone en el cuerpo de la respuesta ni queda accesible al JavaScript del cliente, en línea con las prácticas de autenticación stateless basada en JWT sobre cookies HttpOnly documentadas en la literatura reciente (Bucko et al., 2023).
+
+	\subsubsection*{Estado de sesión en arquitecturas multi-instancia}
+
+	En arquitecturas con múltiples instancias de servidor, la gestión de sesión presenta un desafío adicional. El almacenamiento de sesión en memoria local obliga a usar \textit{sticky sessions}, que atan cada cliente a una instancia específica y limitan la escalabilidad y la tolerancia a fallos: si esa instancia cae, se pierde la sesión del usuario. La solución adoptada consiste en externalizar el estado —en este caso, la blacklist de tokens revocados— a un almacén centralizado en memoria como Redis, de modo que todas las instancias comparten la misma vista del estado sin acoplarse entre sí. Redis ofrece acceso en memoria de baja latencia con expiración automática por TTL, lo que lo hace idóneo para datos de sesión de vida corta y para reducir la carga sobre la base de datos relacional (Privalov \& Stupina, 2024).
+
+	\subsubsection*{Ciclo Request/Response en Spring Boot}
+
+	En el marco de Spring Boot, el ciclo \textit{request/response} se procesa mediante una cadena de filtros de servlet. Para la autenticación stateless con JWT, un filtro personalizado (\texttt{JwtAuthenticationFilter}) intercepta cada petición, extrae el token de la cookie HttpOnly, valida su firma y expiración, y \textbf{consulta la blacklist en Redis} por el identificador único del token (JTI) antes de establecer el contexto de seguridad. Este paso garantiza que un token revocado mediante logout no pueda autenticar aunque siga siendo criptográficamente válido y no haya expirado, resolviendo la principal limitación de los JWT stateless: la dificultad para revocarlos antes de su expiración natural (Bucko et al., 2023).
+
+	% -----------------------------------------------------------
 	\subsection{5.2 ORM y Mapeo Objeto-Relacional}
 	\textit{(Elaborado por: Cruz Pérez Justyn Keith)}
 	
@@ -395,7 +435,76 @@ frametitlealignment=\centering
 	\end{figure}
 	
 	La cobertura del 96\% supera ampliamente el umbral mínimo aceptable del 80\% y valida que la lógica crítica del servicio, el repositorio y el controlador está cubierta por pruebas automatizadas. El 4\% restante corresponde a rutas de excepción de infraestructura que solo se manifiestan con Redis caído.
-	
+
+	% --- 4.8 ---
+	\subsection{Paso 5 (cont.) — Análisis de Escalabilidad Horizontal}
+	\textit{(Elaborado por: Pallo Pinto Daniel Alejandro)}
+
+	Se analiza cómo debería evolucionar la arquitectura del SGED para soportar \textbf{10.000 usuarios concurrentes}, partiendo de la implementación actual (una instancia de backend, una de PostgreSQL y una de Redis).
+
+	\subsubsection*{Limitaciones de la arquitectura actual}
+
+	La configuración actual es adecuada para desarrollo y para la carga esperada de una escuela deportiva, pero presenta un único punto de fallo en cada capa: si la instancia de backend cae, el servicio se interrumpe por completo. Bajo 10.000 usuarios concurrentes, una sola instancia saturaría su pool de hilos y su conexión a la base de datos.
+
+	\subsubsection*{Arquitectura propuesta}
+
+	\begin{mdframed}[linecolor=gray!40, backgroundcolor=gray!5, linewidth=1pt]
+		\begin{ttfamily}\footnotesize
+			\begin{verbatim}
+                    ┌─────────────────────┐
+                    │   Balanceador de     │
+                    │   carga (Nginx)      │
+                    │   reverse proxy      │
+                    └──────────┬──────────┘
+                               │  reparte peticiones
+          ┌────────────────────┼────────────────────┐
+          │                    │                    │
+    ┌─────▼─────┐        ┌─────▼─────┐        ┌─────▼─────┐
+    │ Backend 1 │        │ Backend 2 │        │ Backend 3 │
+    │ Spring    │        │ Spring    │        │ Spring    │
+    │ Boot      │        │ Boot      │        │ Boot      │
+    └─────┬─────┘        └─────┬─────┘        └─────┬─────┘
+          │                    │                    │
+          └────────┬───────────┴──────────┬────────┘
+                   │                       │
+            ┌──────▼──────┐         ┌──────▼───────────┐
+            │   Redis      │         │   PostgreSQL      │
+            │ (sesiones +  │         │   ┌────────────┐  │
+            │  blacklist + │         │   │ Primary    │  │
+            │  cache)      │         │   │ (escritura)│  │
+            └──────────────┘         │   └─────┬──────┘  │
+                                     │         │ replica │
+                                     │   ┌─────▼──────┐  │
+                                     │   │ Read       │  │
+                                     │   │ replica(s) │  │
+                                     │   │ (lectura)  │  │
+                                     │   └────────────┘  │
+                                     └───────────────────┘
+			\end{verbatim}
+		\end{ttfamily}
+	\end{mdframed}
+
+	\subsubsection*{Componentes de la solución}
+
+	\begin{enumerate}
+		\item \textbf{Balanceador de carga (Nginx como reverse proxy).} Distribuye las peticiones entrantes entre las réplicas del backend mediante un algoritmo como \textit{round-robin} o \textit{least-connections}. Es el único punto de entrada público y permite añadir o retirar instancias sin interrumpir el servicio.
+		\item \textbf{Réplicas del backend (escalado horizontal).} Se despliegan varias instancias idénticas de Spring Boot (por ejemplo, \texttt{replicas: 3} en Docker Compose o un \texttt{Deployment} en Kubernetes). Como la aplicación es \textbf{stateless} —el estado de sesión vive en Redis, no en memoria local— cualquier réplica puede atender cualquier petición sin necesidad de \textit{sticky sessions}.
+		\item \textbf{Sesiones centralizadas en Redis.} Este es el requisito que habilita el escalado. La blacklist de JTI y la caché ya residen en Redis, compartido por todas las instancias. Sin esto, cada réplica tendría su propia blacklist y un token revocado en la instancia 1 seguiría siendo válido en la instancia 2 —una falla de seguridad. La centralización garantiza una vista única y coherente del estado de autenticación.
+		\item \textbf{Réplica de lectura de PostgreSQL.} El tráfico de una aplicación de gestión es predominantemente de lectura. Se configura una topología \textit{primary/replica}: la instancia primaria atiende las escrituras y una o varias réplicas de solo lectura atienden las consultas (listados, búsquedas). La caché de Redis absorbe la mayor parte de las lecturas repetidas, y las que llegan a la base de datos se reparten entre las réplicas, aliviando la carga sobre el primario.
+	\end{enumerate}
+
+	\subsubsection*{Rol de la caché en el escalado}
+
+	El benchmark realizado demostró un speedup de 2.07x con un solo cliente. Bajo carga concurrente el beneficio sería aún mayor: cada acierto de caché es una consulta que \textbf{no} llega a PostgreSQL, reduciendo la presión sobre la capa más difícil de escalar (la base de datos). La caché actúa así como el primer amortiguador de carga del sistema. Estudios recientes sobre Redis en aplicaciones web de alta concurrencia confirman que el patrón cache-aside es especialmente efectivo en cargas intensivas de lectura y que su beneficio se acentúa a medida que crece el número de usuarios (Privalov \& Stupina, 2024).
+
+	\subsubsection*{Consideraciones adicionales}
+
+	\begin{itemize}
+		\item \textbf{Salud y auto-recuperación:} el balanceador debe consultar el endpoint \texttt{/actuator/health} de cada réplica y retirar automáticamente las que fallen.
+		\item \textbf{Punto de fallo restante:} Redis y el primario de PostgreSQL siguen siendo puntos únicos; en producción se abordarían con Redis Sentinel/Cluster y failover automático de PostgreSQL.
+		\item \textbf{Observabilidad:} con múltiples instancias, la trazabilidad de logs y métricas centralizadas se vuelve indispensable.
+	\end{itemize}
+
 	\newpage
 	
 	% ============================================================
@@ -698,8 +807,36 @@ frametitlealignment=\centering
 	
 	\textbf{Conclusión:} Con un speedup de 2.07x--2.24x, un costo de infraestructura bajo para esta escala (un solo contenedor) y una degradación segura ante fallos de Redis, la complejidad añadida \textbf{sí se justifica}. La recomendación es revisar esta decisión si el proyecto creciera a un volumen donde el costo de operar Redis en alta disponibilidad (réplicas, failover) empiece a acercarse al beneficio que aporta.
 	
-	% --- C.2 ---
-	\subsection*{C.2 — Casos de prueba adicionales y limitaciones de los tests unitarios}
+	% --- C.2 (Sintesis) ---
+	\subsection*{C.2 — Estrategia de invalidación de caché y mitigación de cache stampede}
+	\textit{(Elaborado por: Pallo Pinto Daniel Alejandro)}
+
+	\subsubsection*{Estrategia de invalidación implementada}
+
+	El sistema emplea el patrón \textbf{cache-aside} con Redis sobre el listado de estudiantes. La coherencia entre la caché y la base de datos se mantiene mediante invalidación explícita: toda operación de escritura (crear, actualizar, eliminar) está anotada con \texttt{@CacheEvict(value = "estudiantes", allEntries = true)}, que elimina todas las entradas del namespace \texttt{estudiantes} en Redis.
+
+	Se optó por \texttt{allEntries = true} en lugar de invalidar claves individuales porque la clave de caché incorpora la combinación de filtros, paginación y ordenamiento (\texttt{nombre-apellido-categoria-activo-page-size-sort}). Una sola escritura puede afectar el resultado de múltiples combinaciones de consulta, por lo que invalidar solo la clave ``afectada'' dejaría entradas obsoletas en otras páginas o filtros. Vaciar el namespace completo garantiza coherencia a costa de un mayor número de cache miss tras cada escritura, un compromiso razonable en un dominio donde las lecturas superan ampliamente a las escrituras (Privalov \& Stupina, 2024).
+
+	Como defensa adicional frente a fallos de invalidación, cada entrada tiene un \textbf{TTL} configurado. Si por algún motivo un \texttt{@CacheEvict} no se ejecutara, la entrada obsoleta no persistiría indefinidamente: expiraría automáticamente, limitando la ventana de inconsistencia.
+
+	\subsubsection*{El problema del cache stampede}
+
+	El \textit{cache stampede} (o \textit{thundering herd}) ocurre cuando una clave muy solicitada expira y, simultáneamente, numerosas peticiones concurrentes encuentran el cache miss y disparan la misma consulta costosa contra la base de datos. En lugar de aliviar la carga, la caché produce un pico abrupto que puede saturar el backend, justo el escenario que se pretendía evitar.
+
+	\subsubsection*{Estrategias de mitigación}
+
+	\begin{enumerate}
+		\item \textbf{Bloqueo mutuo (mutex/lock).} Solo la primera petición que detecta el miss adquiere un lock y recalcula el valor; las demás esperan o reciben el valor anterior mientras tanto. Evita que N peticiones golpeen la base de datos, a costa de introducir contención.
+		\item \textbf{Expiración temprana probabilística} (\textit{probabilistic early expiration}). Cada petición decide, con una probabilidad creciente a medida que se acerca el TTL, refrescar la entrada \textit{antes} de que expire. Así el recálculo se distribuye en el tiempo y no coincide con la expiración exacta, evitando el pico sincronizado.
+		\item \textbf{TTL con jitter.} Añadir una variación aleatoria al TTL de cada entrada evita que múltiples claves creadas al mismo tiempo expiren simultáneamente, dispersando los recálculos.
+	\end{enumerate}
+
+	\subsubsection*{Aplicación al SGED}
+
+	En el estado actual, con un único cliente y sin concurrencia significativa, el riesgo de stampede es bajo. No obstante, bajo la carga concurrente prevista en el análisis de escalabilidad (miles de usuarios), la mitigación más adecuada sería combinar \textbf{TTL con jitter} —de implementación trivial— con un \textbf{mutex} sobre la consulta principal de listado, que es la clave más solicitada y la más costosa de recalcular. La literatura reciente confirma que una gestión adecuada del TTL y de la estrategia de invalidación es determinante para mantener una alta tasa de aciertos de caché sin servir datos obsoletos (Privalov \& Stupina, 2024).
+
+	% --- C.3 ---
+	\subsection*{C.3 — Casos de prueba adicionales y limitaciones de los tests unitarios}
 	
 	\subsubsection*{Casos de prueba adicionales que aportarían valor real}
 	
@@ -737,7 +874,9 @@ frametitlealignment=\centering
 		\item Ambler, S. W. (2003). \textit{Agile Database Techniques: Effective Strategies for the Agile Software Developer}. Wiley.
 		
 		\item Bourque, P., \& Fairley, R. E. (2014). \textit{Guide to the Software Engineering Body of Knowledge (SWEBOK): Version 3.0}. IEEE Computer Society Press.
-		
+
+		\item Bucko, A., Vishi, K., Krasniqi, B., \& Rexha, B. (2023). Enhancing JWT authentication and authorization in web applications based on user behavior history. \textit{Computers, 12}(4), 78. \url{https://doi.org/10.3390/computers12040078}
+
 		\item Deobald, K. (2018). \textit{A Pod Architecture to Scale Shopify}. Shopify Engineering Blog.
 		
 		\item Fowler, M. (2002). \textit{Patterns of Enterprise Application Architecture}. Addison-Wesley Professional.
@@ -749,6 +888,8 @@ frametitlealignment=\centering
 		\item Microsoft Azure Architecture Center. (2023). \textit{Cache-Aside pattern}. Recuperado de \url{https://learn.microsoft.com/azure/architecture/patterns/cache-aside}
 		
 		\item Jones, M., Bradley, J., \& Sakimura, N. (2015). \textit{RFC 7519 — JSON Web Token (JWT)}. Internet Engineering Task Force (IETF).
+
+		\item Privalov, M., \& Stupina, A. (2024). Improving web-oriented information systems efficiency using Redis caching mechanisms. \textit{Indonesian Journal of Electrical Engineering and Computer Science, 33}(3), 1667--1675. \url{https://doi.org/10.11591/ijeecs.v33.i3.pp1667-1675}
 	\end{itemize}
 	
 \end{document}
